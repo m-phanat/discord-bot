@@ -1,5 +1,6 @@
 const { Util, MessageEmbed } = require('discord.js')
 const config = require('../../config.json')
+const axios = require('axios')
 const YouTube = require('simple-youtube-api')
 const youtube = new YouTube(config.youtube.key)
 const ytdl = require('ytdl-core')
@@ -14,6 +15,7 @@ module.exports = {
       const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : ''
       const queue = message.client.queue
       const serverQueue = message.client.queue.get(message.guild.id)
+      var previousVideoId = ''
 
       if (!args[0]) return message.channel.send('**Please Enter Song Name Or Link!**')
 
@@ -34,9 +36,12 @@ module.exports = {
         console.log(args.slice(1).join(' '))
         var videos = await youtube.searchVideos(args.slice(1).join(' '), 10)
         var link = await youtube.getVideoByID(videos[0].id)
+        previousVideoId = videos[0].id
+        console.log(link, videos)
         handleVideo(`https://www.youtube.com/watch?v=${link.id}`)
       }
       async function handleVideo(url) {
+        console.log(url)
         const songInfo = await ytdl.getInfo(url)
         const song = {
           title: songInfo.videoDetails.title,
@@ -79,10 +84,16 @@ module.exports = {
 
         if (!song) {
           // serverQueue.voiceChannel.leave();
-          queue.delete(guild.id)
+          console.log('empty queue')
+          if (message.client.isAutoPlay) {
+            console.log('findRalateVideos')
+            findRalateVideos()
+          } else {
+            queue.delete(guild.id)
+          }
+
           return
         }
-
         // let npmin = Math.floor(song.time / 60)
         // let npsec = song.time - npmin * 60
         // let np = `${npmin}:${npsec}`.split(' ')
@@ -98,12 +109,22 @@ module.exports = {
 
         const embed = new MessageEmbed()
           .setColor('GREEN')
-          .setTitle('Now Playing\n')
           .setThumbnail(song.thumbnail)
           .setTimestamp()
           .setDescription(`🎵 Now playing:\n **${song.title}** 🎵\n`)
           .setFooter(message.member.displayName, message.author.displayAvatarURL())
         serverQueue.textChannel.send(embed)
+      }
+      async function findRalateVideos() {
+        console.log(previousVideoId)
+        if (!previousVideoId) return
+        let response = await axios.get(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&relatedToVideoId=${previousVideoId}&type=video&key=${config.youtube.key}`
+        )
+        let item = response.data.items[1]
+        let url = `https://www.youtube.com/watch?v=${item.id.videoId}`
+        console.log('related', url)
+        handleVideo(url)
       }
     } catch (error) {
       console.log(error)
