@@ -1,0 +1,9 @@
+{
+  "prefix": ".",
+  "token": "",
+  "youtube": {
+    "key": "",
+    "maxResults": 5,
+    "regionCode": "TH"
+  }
+}
