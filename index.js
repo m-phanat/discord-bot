@@ -18,6 +18,13 @@ const load = (dirs) => {
 
 client.once('ready', () => {
   console.log('Ready!')
+  client.user.setPresence({
+    status: 'online', //You can show online, idle....
+    game: {
+      name: 'Using .help', //The message shown
+      type: 'STREAMING' //PLAYING: WATCHING: LISTENING: STREAMING:
+    }
+  })
 })
 
 client.on('message', (message) => {

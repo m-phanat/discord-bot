@@ -15,7 +15,7 @@ module.exports = {
       const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : ''
       const queue = message.client.queue
       const serverQueue = message.client.queue.get(message.guild.id)
-      var previousVideoId = ''
+      var related_videos_id = ''
 
       if (!args[0]) return message.channel.send('**Please Enter Song Name Or Link!**')
 
@@ -35,14 +35,13 @@ module.exports = {
       } else {
         console.log(args.slice(1).join(' '))
         var videos = await youtube.searchVideos(args.slice(1).join(' '), 10)
-        var link = await youtube.getVideoByID(videos[0].id)
-        previousVideoId = videos[0].id
-        console.log(link, videos)
-        handleVideo(`https://www.youtube.com/watch?v=${link.id}`)
+        handleVideo(`https://www.youtube.com/watch?v=${videos[0].id}`)
       }
+
       async function handleVideo(url) {
-        console.log(url)
         const songInfo = await ytdl.getInfo(url)
+        console.log('song info', songInfo.related_videos)
+        related_videos_id = songInfo.related_videos[0].id
         const song = {
           title: songInfo.videoDetails.title,
           url: songInfo.videoDetails.video_url
@@ -86,8 +85,7 @@ module.exports = {
           // serverQueue.voiceChannel.leave();
           console.log('empty queue')
           if (message.client.isAutoPlay) {
-            console.log('findRalateVideos')
-            findRalateVideos()
+            handleVideo(`https://www.youtube.com/watch?v=${related_videos_id}`)
           } else {
             queue.delete(guild.id)
           }
@@ -116,14 +114,6 @@ module.exports = {
         serverQueue.textChannel.send(embed)
       }
       async function findRalateVideos() {
-        console.log(previousVideoId)
-        if (!previousVideoId) return
-        let response = await axios.get(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&relatedToVideoId=${previousVideoId}&type=video&key=${config.youtube.key}`
-        )
-        let item = response.data.items[1]
-        let url = `https://www.youtube.com/watch?v=${item.id.videoId}`
-        console.log('related', url)
         handleVideo(url)
       }
     } catch (error) {
