@@ -73,11 +73,14 @@ module.exports = {
           }
         } else {
           serverQueue.songs.push(song)
-          return message.channel.send(`${song.title} has been added to the queue!`)
+          const embed = new MessageEmbed()
+            .setColor('PURPLE')
+            .setDescription(`${song.title} has been added to the queue!`)
+          return message.channel.send(embed)
         }
       }
 
-      function play(song) {
+      async function play(song) {
         const queue = message.client.queue
         const guild = message.guild
         const serverQueue = queue.get(message.guild.id)
@@ -96,10 +99,20 @@ module.exports = {
         let npmin = Math.floor(song.time / 60)
         let npsec = song.time - npmin * 60
         let np = `${npmin}:${npsec}`.split(' ')
+        let send = ''
 
         const dispatcher = serverQueue.connection
           .play(ytdl(song.url, { highWaterMark: 1 << 20, quality: 'highestaudio' }))
           .on('finish', () => {
+            try {
+              message.channel.messages
+                .fetch(send.id)
+                .then((message) => console.log(message.delete()))
+                .catch(console.error)
+            } catch (error) {
+              message.channel.send(error.message)
+            }
+
             serverQueue.songs.shift()
             play(serverQueue.songs[0])
           })
@@ -108,17 +121,11 @@ module.exports = {
 
         const embed = new MessageEmbed()
           .setColor('GREEN')
-          .setThumbnail(song.thumbnail)
-          .setTimestamp()
-          .setDescription(`🎵 Now playing:\n **${song.title}** 🎵\n\n Song Length: **${np}**`)
-          .setFooter(message.member.displayName, message.author.displayAvatarURL())
+          .setTitle('Now playing')
+          .setDescription(`[${song.title}](${song.url})`)
 
-        serverQueue.textChannel
-          .send(embed)
-          .then((msg) => {
-            msg.delete({ timeout: song.time * 1000 /*time unitl delete in milliseconds*/ })
-          })
-          .catch(console.error)
+        send = await serverQueue.textChannel.send(embed)
+        console.log(send.id)
       }
     } catch (error) {
       console.log(error)
