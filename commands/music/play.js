@@ -40,11 +40,12 @@ module.exports = {
 
       async function handleVideo(url) {
         const songInfo = await ytdl.getInfo(url)
-        console.log('song info', songInfo.related_videos)
+
         related_videos_id = songInfo.related_videos[0].id
         const song = {
           title: songInfo.videoDetails.title,
-          url: songInfo.videoDetails.video_url
+          url: songInfo.videoDetails.video_url,
+          time: songInfo.videoDetails.lengthSeconds
         }
 
         if (!serverQueue) {
@@ -92,9 +93,9 @@ module.exports = {
 
           return
         }
-        // let npmin = Math.floor(song.time / 60)
-        // let npsec = song.time - npmin * 60
-        // let np = `${npmin}:${npsec}`.split(' ')
+        let npmin = Math.floor(song.time / 60)
+        let npsec = song.time - npmin * 60
+        let np = `${npmin}:${npsec}`.split(' ')
 
         const dispatcher = serverQueue.connection
           .play(ytdl(song.url, { highWaterMark: 1 << 20, quality: 'highestaudio' }))
@@ -109,12 +110,15 @@ module.exports = {
           .setColor('GREEN')
           .setThumbnail(song.thumbnail)
           .setTimestamp()
-          .setDescription(`🎵 Now playing:\n **${song.title}** 🎵\n`)
+          .setDescription(`🎵 Now playing:\n **${song.title}** 🎵\n\n Song Length: **${np}**`)
           .setFooter(message.member.displayName, message.author.displayAvatarURL())
-        serverQueue.textChannel.send(embed)
-      }
-      async function findRalateVideos() {
-        handleVideo(url)
+
+        serverQueue.textChannel
+          .send(embed)
+          .then((msg) => {
+            msg.delete({ timeout: song.time * 1000 /*time unitl delete in milliseconds*/ })
+          })
+          .catch(console.error)
       }
     } catch (error) {
       console.log(error)
