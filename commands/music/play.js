@@ -125,7 +125,7 @@ module.exports = {
           .setDescription(`[${song.title}](${song.url})`)
 
         send = await serverQueue.textChannel.send(embed)
-        console.log(send.id)
+        // console.log(send.id)
       }
     } catch (error) {
       console.log(error)

@@ -25,12 +25,13 @@ client.once('ready', () => {
       type: 'STREAMING' //PLAYING: WATCHING: LISTENING: STREAMING:
     }
   })
+  client.user.setActivity('with the music')
 })
 
 client.on('message', (message) => {
   if (!message.content.startsWith(prefix) || message.author.bot) return
 
-  //   const serverQueue = queue.get(message.guild.id)
+  //   const serverQueue = queue.1get(message.guild.id)
 
   const args = message.content.slice(prefix.length).trim().split(/ +/)
   const commandName = args.shift().toLowerCase()
@@ -47,8 +48,31 @@ client.on('message', (message) => {
   }
 })
 
-client.login(token)
+client.on('voiceStateUpdate', (oldState, newState) => {
+  // check if someone connects or disconnects
+  if (oldState.channelID === null || typeof oldState.channelID == 'undefined') return
+  // check if the bot is disconnecting
+  if (newState.id !== client.user.id) return
+  // clear the queue
+  return client.queue.delete(oldState.guild.id)
+})
 
+client.on('disconnect', function (message) {
+  console.log(`Bot DISCONNECTED at ${new Date().toISOString()}`)
+  console.log('Attempting reconnect...')
+  const serverQueue = message.client.queue.get(message.guild.id)
+  serverQueue.connection.dispatcher.end()
+  serverQueue.songs.shift()
+  message.client.isAutoPlay = false
+  // client.connect()
+  // if (bot.connected == true) {
+  //   console.log('Reconnected to Discord')
+  // } else {
+  //   console.log('Reconnect failed...')
+  // }
+})
+
+client.login(token)
 ;('use strict')
 
 // [START gae_node_request_example]
