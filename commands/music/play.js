@@ -41,7 +41,9 @@ module.exports = {
       async function handleVideo(url) {
         const songInfo = await ytdl.getInfo(url)
 
-        related_videos_id = songInfo.related_videos[0].id
+        related_videos_id =
+          songInfo.response.contents.twoColumnWatchNextResults.autoplay.autoplay.sets[0].autoplayVideo.watchEndpoint
+            .videoId
         const song = {
           title: songInfo.videoDetails.title,
           url: songInfo.videoDetails.video_url,
