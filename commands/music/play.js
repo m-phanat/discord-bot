@@ -41,9 +41,11 @@ module.exports = {
       async function handleVideo(url) {
         const songInfo = await ytdl.getInfo(url)
 
-        related_videos_id =
-          songInfo.response.contents.twoColumnWatchNextResults.autoplay.autoplay.sets[0].autoplayVideo.watchEndpoint
-            .videoId
+        //random next vidio
+        let items = songInfo.related_videos
+        let item = items[Math.floor(Math.random() * items.length)]
+        related_videos_id = item.id
+
         const song = {
           title: songInfo.videoDetails.title,
           url: songInfo.videoDetails.video_url,
@@ -109,7 +111,7 @@ module.exports = {
             try {
               message.channel.messages
                 .fetch(send.id)
-                .then((message) => console.log(message.delete()))
+                .then((message) => message.delete())
                 .catch(console.error)
             } catch (error) {
               message.channel.send(error.message)
