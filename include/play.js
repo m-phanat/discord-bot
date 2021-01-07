@@ -28,16 +28,41 @@ module.exports = {
       if (autoplay && autoplayId != '') {
         let url = `https://www.youtube.com/watch?v=${autoplayId}`
         try {
-          songInfo = await ytdl.getInfo(url)
-          song = {
-            title: songInfo.videoDetails.title,
-            url: songInfo.videoDetails.video_url,
-            duration: songInfo.videoDetails.lengthSeconds
+          let songInfoTemp = await ytdl.getInfo(url)
+          let songTemp = null
+
+          const queueConstruct = {
+            textChannel: message.channel,
+            channel,
+            connection: null,
+            songs: [],
+            loop: false,
+            volume: DEFAULT_VOLUME || 100,
+            playing: true
           }
-          let items = songInfo.related_videos.filter((item) => item.length_seconds < 600)
+
+          songTemp = {
+            title: songInfoTemp.videoDetails.title,
+            url: songInfoTemp.videoDetails.video_url,
+            duration: songInfoTemp.videoDetails.lengthSeconds
+          }
+          let items = songInfoTemp.related_videos.filter((item) => item.length_seconds < 600)
           let item = items[Math.floor(Math.random() * items.length)]
-          // console.log(items, items);
           message.client.autoplayID = item.id
+
+          queueConstruct.songs.push(song)
+          message.client.queue.set(message.guild.id, queueConstruct)
+
+          try {
+            queueConstruct.connection = await channel.join()
+            await queueConstruct.connection.voice.setSelfDeaf(false)
+            play(queueConstruct.songs[0], message)
+          } catch (error) {
+            console.error(error)
+            message.client.queue.delete(message.guild.id)
+            await channel.leave()
+            return message.channel.send(`Could not join the channel: ${error}`).catch(console.error)
+          }
         } catch (error) {
           console.error(error)
           return message.reply(error.message).catch(console.error)
