@@ -1,95 +1,85 @@
-const fs = require('fs')
-const Discord = require('discord.js')
-const Client = require('./client/Client')
-const { token, prefix } = require('./config.json')
+/**
+ * Module Imports
+ */
+const { Client, Collection } = require("discord.js");
+const { readdirSync } = require("fs");
+const { join } = require("path");
+const { TOKEN, PREFIX } = require("./util/EvobotUtil");
 
-const client = new Client()
-client.commands = new Discord.Collection()
+const client = new Client({ disableMentions: "everyone" });
 
-const load = (dirs) => {
-  const commandFiles = fs.readdirSync(`./commands/${dirs}`).filter((file) => file.endsWith('.js'))
-  for (const file of commandFiles) {
-    const command = require(`./commands/${dirs}/${file}`)
-    client.commands.set(command.name, command)
-  }
+client.login(TOKEN);
+client.commands = new Collection();
+client.prefix = PREFIX;
+client.queue = new Map();
+client.autoplay = true;
+client.autoplayID = "";
+const cooldowns = new Collection();
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Client Events
+ */
+client.on("ready", () => {
+  console.log(`${client.user.username} ready!`);
+  client.user.setActivity(`${PREFIX}help and ${PREFIX}play`, { type: "LISTENING" });
+});
+client.on("warn", (info) => console.log(info));
+client.on("error", console.error);
+
+/**
+ * Import all commands
+ */
+const commandFiles = readdirSync(join(__dirname, "commands")).filter((file) => file.endsWith(".js"));
+for (const file of commandFiles) {
+  const command = require(join(__dirname, "commands", `${file}`));
+  client.commands.set(command.name, command);
 }
 
-;['music', 'old'].forEach((x) => load(x))
+client.on("message", async (message) => {
+  if (message.author.bot) return;
+  if (!message.guild) return;
 
-client.once('ready', () => {
-  console.log('Ready!')
-  client.user.setPresence({
-    status: 'online', //You can show online, idle....
-    game: {
-      name: 'Using .help', //The message shown
-      type: 'STREAMING' //PLAYING: WATCHING: LISTENING: STREAMING:
-    }
-  })
-  client.user.setActivity('with the music')
-})
+  const prefixRegex = new RegExp(`^(<@!?${client.user.id}>|${escapeRegex(PREFIX)})\\s*`);
+  if (!prefixRegex.test(message.content)) return;
 
-client.on('message', (message) => {
-  if (!message.content.startsWith(prefix) || message.author.bot) return
+  const [, matchedPrefix] = message.content.match(prefixRegex);
 
-  //   const serverQueue = queue.1get(message.guild.id)
-
-  const args = message.content.slice(prefix.length).trim().split(/ +/)
-  const commandName = args.shift().toLowerCase()
+  const args = message.content.slice(matchedPrefix.length).trim().split(/ +/);
+  const commandName = args.shift().toLowerCase();
 
   const command =
-    client.commands.get(commandName) || client.commands.find((cmd) => cmd.aliases && cmd.aliases.includes(commandName))
+    client.commands.get(commandName) ||
+    client.commands.find((cmd) => cmd.aliases && cmd.aliases.includes(commandName));
 
-  if (!command) return
-  try {
-    command.execute(message, args)
-  } catch (error) {
-    console.error(error)
-    message.reply('there was an error trying to execute that command!')
+  if (!command) return;
+
+  if (!cooldowns.has(command.name)) {
+    cooldowns.set(command.name, new Collection());
   }
-})
 
-client.on('voiceStateUpdate', (oldState, newState) => {
-  // check if someone connects or disconnects
-  if (oldState.channelID === null || typeof oldState.channelID == 'undefined') return
-  // check if the bot is disconnecting
-  if (newState.id !== client.user.id) return
-  // clear the queue
-  return client.queue.delete(oldState.guild.id)
-})
+  const now = Date.now();
+  const timestamps = cooldowns.get(command.name);
+  const cooldownAmount = (command.cooldown || 1) * 1000;
 
-client.on('disconnect', function (message) {
-  console.log(`Bot DISCONNECTED at ${new Date().toISOString()}`)
-  console.log('Attempting reconnect...')
-  const serverQueue = message.client.queue.get(message.guild.id)
-  serverQueue.connection.dispatcher.end()
-  serverQueue.songs.shift()
-  message.client.isAutoPlay = false
-  // client.connect()
-  // if (bot.connected == true) {
-  //   console.log('Reconnected to Discord')
-  // } else {
-  //   console.log('Reconnect failed...')
-  // }
-})
+  if (timestamps.has(message.author.id)) {
+    const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
 
-client.login(token)
-;('use strict')
+    if (now < expirationTime) {
+      const timeLeft = (expirationTime - now) / 1000;
+      return message.reply(
+        `please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`
+      );
+    }
+  }
 
-// [START gae_node_request_example]
-const express = require('express')
+  timestamps.set(message.author.id, now);
+  setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
-const app = express()
-
-app.get('/', (req, res) => {
-  res.status(200).send('Hello, world!').end()
-})
-
-// Start the server
-const PORT = process.env.PORT || 8080
-app.listen(PORT, () => {
-  console.log(`App listening on port ${PORT}`)
-  console.log('Press Ctrl+C to quit.')
-})
-// [END gae_node_request_example]
-
-module.exports = app
+  try {
+    command.execute(message, args);
+  } catch (error) {
+    console.error(error);
+    message.reply("There was an error executing that command.").catch(console.error);
+  }
+});
