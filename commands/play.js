@@ -85,7 +85,7 @@ module.exports = {
         let items = songInfo.related_videos.filter((item) => item.length_seconds < 600)
         let item = items[Math.floor(Math.random() * items.length)]
         // console.log(items, items);
-        message.client.autoplayID = item.id
+        message.client.autoplayID = item && item.id ? item.id : ''
       } catch (error) {
         console.error(error)
         return message.reply(error.message).catch(console.error)
@@ -109,7 +109,7 @@ module.exports = {
         let items = songInfo.related_videos.filter((item) => item.length_seconds < 600)
         let item = items[Math.floor(Math.random() * items.length)]
         // console.log(items, items);
-        message.client.autoplayID = item.id
+        message.client.autoplayID = item && item.id ? item.id : ''
 
         song = {
           title: songInfo.videoDetails.title,

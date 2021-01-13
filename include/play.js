@@ -31,7 +31,8 @@ module.exports = {
           let songInfoTemp = await ytdl.getInfo(url)
           let items = songInfoTemp.related_videos.filter((item) => item.length_seconds < 600)
           let item = items[Math.floor(Math.random() * items.length)]
-          message.client.autoplayID = item.id
+
+          message.client.autoplayID = item && item.id ? item.id : ''
 
           song = {
             title: songInfoTemp.videoDetails.title,
