@@ -1,11 +1,11 @@
 const ytdl = require('erit-ytdl')
 const scdl = require('soundcloud-downloader').default
-const { canModifyQueue, STAY_TIME } = require('../util/EvobotUtil')
+const { canModifyQueue, STAY_TIME } = require('../util/Utils')
 const { MessageEmbed } = require('discord.js')
 
 module.exports = {
   async play(song, message) {
-    const { SOUNDCLOUD_CLIENT_ID } = require('../util/EvobotUtil')
+    const { SOUNDCLOUD_CLIENT_ID } = require('../util/Utils')
 
     let config
     let playingMessage
@@ -121,7 +121,7 @@ module.exports = {
       const embed = new MessageEmbed()
         .setColor('GREEN')
         .setTitle('Now playing')
-        .setDescription(`[${song.title}](${song.url})`)
+        .setDescription(`[${song.title}](${song.spotify_url || song.url})`)
       playingMessage = await queue.textChannel.send(embed)
       // await playingMessage.react("⏭");
       // await playingMessage.react("⏯");

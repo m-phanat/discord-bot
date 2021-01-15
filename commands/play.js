@@ -3,9 +3,15 @@ const ytdl = require('ytdl-core')
 const YouTubeAPI = require('simple-youtube-api')
 const scdl = require('soundcloud-downloader').default
 const https = require('https')
-const { YOUTUBE_API_KEY, SOUNDCLOUD_CLIENT_ID, DEFAULT_VOLUME } = require('../util/EvobotUtil')
+const config = require('../config.json')
+const { YOUTUBE_API_KEY, SOUNDCLOUD_CLIENT_ID, DEFAULT_VOLUME } = require('../util/Utils')
 const youtube = new YouTubeAPI(YOUTUBE_API_KEY)
 const { MessageEmbed } = require('discord.js')
+const spotifyUri = require('spotify-uri')
+const axios = require('axios')
+
+const SpotifyWebApi = require('spotify-web-api-node')
+const SpotifyTrackStream = require('spotify-track-stream')
 
 module.exports = {
   name: 'play',
@@ -35,6 +41,7 @@ module.exports = {
     const playlistPattern = /^.*(list=)([^#\&\?]*).*/gi
     const scRegex = /^https?:\/\/(soundcloud\.com)\/(.*)$/
     const mobileScRegex = /^https?:\/\/(soundcloud\.app\.goo\.gl)\/(.*)$/
+    const spotifyRegex = /((http|https)\:\/\/(open\.)*(spotify\.com\/)(track|album|playlist))/gi
     const url = args[0]
     const urlValid = videoPattern.test(args[0])
 
@@ -86,6 +93,7 @@ module.exports = {
         let item = items[Math.floor(Math.random() * items.length)]
         // console.log(items, items);
         message.client.autoplayID = item && item.id ? item.id : ''
+        creatQueue(song)
       } catch (error) {
         console.error(error)
         return message.reply(error.message).catch(console.error)
@@ -98,10 +106,72 @@ module.exports = {
           url: trackInfo.permalink_url,
           duration: Math.ceil(trackInfo.duration / 1000)
         }
+        creatQueue(song)
       } catch (error) {
         console.error(error)
         return message.reply(error.message).catch(console.error)
       }
+    } else if (spotifyRegex.test(url)) {
+      async function playSpotifyTrack(spotify_track_id, uri) {
+        const spotify_track_response = await axios.get(
+          `https://api.spotify.com/v1/tracks/${spotify_track_id}?access_token=${spotify_access_token}`
+        )
+        // console.log('spotify_track_response.data', spotify_track_response.data)
+
+        const spotify_track_name = spotify_track_response.data.name
+        const spotify_artists_names = spotify_track_response.data.artists.map((artist) => artist.name).join(', ')
+        const spotify_track_name_by_artists = `${spotify_track_name} by ${spotify_artists_names}`
+
+        // console.log(search)
+        const results = await youtube.searchVideos(spotify_track_name_by_artists, 1)
+        songInfo = await ytdl.getInfo(results[0].url)
+        let items = songInfo.related_videos.filter((item) => item.length_seconds < 600)
+        let item = items[Math.floor(Math.random() * items.length)]
+        // console.log(items, items);
+        message.client.autoplayID = item && item.id ? item.id : ''
+
+        song = {
+          title: spotify_track_name_by_artists,
+          url: songInfo.videoDetails.video_url,
+          spotify_url: uri,
+          duration: songInfo.videoDetails.lengthSeconds
+        }
+        creatQueue(song)
+      }
+
+      let parsed_uri_data
+      try {
+        parsed_uri_data = spotifyUri.parse(url)
+      } catch (error) {
+        console.error(error)
+      }
+      console.log('parsed_data', parsed_uri_data)
+
+      if (!parsed_uri_data) {
+        /* nothing could be parsed from the input */
+        let m = new MessageEmbed().setColor('RED').setDescription(`I don't think that was a valid spotify url!`)
+        message.channel.send(m)
+        return
+      }
+
+      const spotify_access_token = await get_spotify_access_token()
+
+      if (parsed_uri_data.type === 'playlist' || parsed_uri_data.type === 'album') {
+        // await playSpotifyTracks(parsed_uri_data.id, parsed_uri_data.type)
+      } else if (parsed_uri_data.type === 'track') {
+        try {
+          await playSpotifyTrack(parsed_uri_data.id, parsed_uri_data.uri)
+        } catch (error) {
+          console.error(error)
+          return message.reply(error.message).catch(console.error)
+        }
+      } else {
+        /* the parsed uri is not for a track or playlist */
+        let m = new MessageEmbed().setColor('RED').setDescription(`I can only play spotify song/track urls!`)
+        message.channel.send(m)
+        return
+      }
+      return
     } else {
       try {
         const results = await youtube.searchVideos(search, 1)
@@ -116,31 +186,54 @@ module.exports = {
           url: songInfo.videoDetails.video_url,
           duration: songInfo.videoDetails.lengthSeconds
         }
+        creatQueue(song)
       } catch (error) {
         console.error(error)
-        return message.reply(error.message).catch(console.error)
+        // return message.reply(error.message).catch(console.error)
       }
     }
 
-    if (serverQueue) {
-      serverQueue.songs.push(song)
+    async function creatQueue(song) {
+      if (serverQueue) {
+        serverQueue.songs.push(song)
 
-      const embed = new MessageEmbed().setColor('PURPLE').setDescription(`${song.title} has been added to the queue!`)
-      return message.channel.send(embed).catch(console.error)
-    }
+        const embed = new MessageEmbed().setColor('PURPLE').setDescription(`${song.title} has been added to the queue!`)
+        return message.channel.send(embed).catch(console.error)
+      }
 
-    queueConstruct.songs.push(song)
-    message.client.queue.set(message.guild.id, queueConstruct)
+      queueConstruct.songs.push(song)
+      message.client.queue.set(message.guild.id, queueConstruct)
 
-    try {
-      queueConstruct.connection = await channel.join()
-      await queueConstruct.connection.voice.setSelfDeaf(false)
-      play(queueConstruct.songs[0], message)
-    } catch (error) {
-      console.error(error)
-      message.client.queue.delete(message.guild.id)
-      await channel.leave()
-      return message.channel.send(`Could not join the channel: ${error}`).catch(console.error)
+      try {
+        queueConstruct.connection = await channel.join()
+        await queueConstruct.connection.voice.setSelfDeaf(false)
+        play(queueConstruct.songs[0], message)
+      } catch (error) {
+        console.error(error)
+        message.client.queue.delete(message.guild.id)
+        await channel.leave()
+        return message.channel.send(`Could not join the channel: ${error}`).catch(console.error)
+      }
     }
   }
+}
+
+//---------------------------------------------------------------------------------------------------------------//
+
+async function get_spotify_access_token() {
+  const base64_encoded_authorization = new Buffer.from(
+    `${config.SPOTIFY_CLIENT_ID}:${config.SPOTIFY_CLIENT_SECRET}`
+  ).toString(`base64`)
+
+  const spotify_auth_response = await axios({
+    url: 'https://accounts.spotify.com/api/token?grant_type=client_credentials',
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${base64_encoded_authorization}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  })
+
+  return spotify_auth_response.data.access_token
 }
