@@ -3,15 +3,17 @@ const ytdl = require('ytdl-core')
 const YouTubeAPI = require('simple-youtube-api')
 const scdl = require('soundcloud-downloader').default
 const https = require('https')
-const config = require('../config.json')
-const { YOUTUBE_API_KEY, SOUNDCLOUD_CLIENT_ID, DEFAULT_VOLUME } = require('../util/Utils')
+const {
+  YOUTUBE_API_KEY,
+  SOUNDCLOUD_CLIENT_ID,
+  DEFAULT_VOLUME,
+  SPOTIFY_CLIENT_ID,
+  SPOTIFY_CLIENT_SECRET
+} = require('../util/Utils')
 const youtube = new YouTubeAPI(YOUTUBE_API_KEY)
 const { MessageEmbed } = require('discord.js')
 const spotifyUri = require('spotify-uri')
 const axios = require('axios')
-
-const SpotifyWebApi = require('spotify-web-api-node')
-const SpotifyTrackStream = require('spotify-track-stream')
 
 module.exports = {
   name: 'play',
@@ -221,9 +223,9 @@ module.exports = {
 //---------------------------------------------------------------------------------------------------------------//
 
 async function get_spotify_access_token() {
-  const base64_encoded_authorization = new Buffer.from(
-    `${config.SPOTIFY_CLIENT_ID}:${config.SPOTIFY_CLIENT_SECRET}`
-  ).toString(`base64`)
+  const base64_encoded_authorization = new Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString(
+    `base64`
+  )
 
   const spotify_auth_response = await axios({
     url: 'https://accounts.spotify.com/api/token?grant_type=client_credentials',
